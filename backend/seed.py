@@ -1,4 +1,4 @@
-from database import SessionLocal, result_map
+from database import SessionLocal
 from models import WorkflowConfig, Base, engine as db_engine
 
 # Initialize DB tables if they don't exist
