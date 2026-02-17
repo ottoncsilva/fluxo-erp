@@ -1,5 +1,5 @@
-from database import SessionLocal
-from models import WorkflowConfig, Base, engine as db_engine
+from database import SessionLocal, engine as db_engine
+from models import WorkflowConfig, Base
 
 # Initialize DB tables if they don't exist
 Base.metadata.create_all(bind=db_engine)
