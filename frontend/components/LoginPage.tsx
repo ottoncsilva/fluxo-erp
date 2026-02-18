@@ -14,8 +14,10 @@ const LoginPage: React.FC = () => {
         setError('');
         try {
             await login(email, password);
-        } catch (err) {
-            setError('Login falhou. Verifique suas credenciais.');
+        } catch (err: any) {
+            console.error(err);
+            const msg = err.response?.data?.detail || err.message || 'Erro desconhecido. Verifique o console.';
+            setError(`Login falhou: ${msg}`);
         } finally {
             setLoading(false);
         }
