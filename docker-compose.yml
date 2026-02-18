@@ -12,44 +12,34 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    networks:
-      - app-network
 
   backend:
     build: ./backend
     container_name: fluxo-planejados-backend
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - ./backend:/app
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://user:password@db:5432/fluxo_erp
     depends_on:
       - db
-    networks:
-      - app-network
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/fluxo_erp
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
-    build:
+    build: 
       context: ./frontend
       dockerfile: Dockerfile.dev
     container_name: fluxo-planejados-frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8000
-    depends_on:
-      - backend
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
 
 volumes:
   postgres_data:

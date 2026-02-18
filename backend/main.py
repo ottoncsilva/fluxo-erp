@@ -1,123 +1,127 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
-from datetime import datetime, timedelta
-
+from typing import List, Optional
+from pydantic import BaseModel
 from database import engine, get_db, Base
 import models
-import schemas
-from seed import seed_workflow
+from fastapi.middleware.cors import CORSMiddleware
+import os
+
+# Cria as tabelas se não existirem
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Fluxo Planejados ERP")
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Configuração CORS
+origins = [
+    "http://localhost:5173",
+    "http://localhost:80",
+    "http://localhost",
+    "*", # Permite tudo para evitar dor de cabeça no MVP
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
-def on_startup():
+def startup_event():
+    from seed import seed_workflow
     try:
         seed_workflow()
+        print("--- Seed Automático Executado ---")
     except Exception as e:
-        print(f"Error seeding database: {e}")
+        print(f"Erro no Seed Automático: {e}")
 
-# --- Clients ---
-@app.post("/clients/", response_model=schemas.Client)
-def create_client(client: schemas.ClientCreate, db: Session = Depends(get_db)):
-    db_client = models.Client(**client.dict())
-    db.add(db_client)
-    db.commit()
-    db.refresh(db_client)
-    return db_client
-
-@app.get("/clients/", response_model=List[schemas.Client])
-def read_clients(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    clients = db.query(models.Client).offset(skip).limit(limit).all()
-    return clients
-
-# --- Projects ---
-@app.post("/projects/", response_model=schemas.Project)
-def create_project(request: schemas.ProjectCreateRequest, db: Session = Depends(get_db)):
-    # 1. Create Client
-    db_client = models.Client(**request.client.dict())
-    db.add(db_client)
-    db.commit()
-    db.refresh(db_client)
-
-    # 2. Create Project
-    db_project = models.Project(
-        client_id=db_client.id,
-        status="Em Andamento",
-        total_value=request.project.total_value
-    )
-    db.add(db_project)
-    db.commit()
-    db.refresh(db_project)
-
-    # 3. Create Initial Stage (We need to populate all stages logic here later, 
-    # for now getting the first one from workflow)
-    # Ideally, a project starts at 1.1 Briefing
+# --- Schemas Pydantic (Simples para Leitura) ---
+class WorkflowStage(BaseModel):
+    id: int
+    stage_code: str
+    stage_name: str
+    stage_category: str
+    owner_role: str
     
-    # Get first workflow step
-    first_step = db.query(models.WorkflowConfig).filter(models.WorkflowConfig.sub_stage_number == "1.1").first()
+    class Config:
+        from_attributes = True
+
+class RoomRead(BaseModel):
+    id: int
+    name: str
+    current_stage_id: int
     
-    if first_step:
-        deadline = datetime.now() + timedelta(days=first_step.sla_days)
-        stage = models.ProjectStage(
-            project_id=db_project.id,
-            stage_name=first_step.name,
-            current_sub_stage_id=first_step.sub_stage_number,
-            sla_deadline=deadline
-        )
-        db.add(stage)
-        db.commit()
+    class Config:
+        from_attributes = True
 
-    db.refresh(db_project)
-    return db_project
+class ProjectRead(BaseModel):
+    id: int
+    name: str
+    client_name: str
+    rooms: List[RoomRead] = []
 
-@app.get("/projects/", response_model=List[schemas.Project])
-def read_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    projects = db.query(models.Project).offset(skip).limit(limit).all()
-    return projects
+    class Config:
+        from_attributes = True
 
-@app.get("/workflow/", response_model=List[schemas.WorkflowConfig])
+# --- Endpoints ---
+
+@app.get("/")
+def read_root():
+    return {"message": "API Fluxo Planejados está ON! 🚀"}
+
+@app.post("/seed")
+def run_seed():
+    from seed import seed_workflow
+    try:
+        seed_workflow()
+        return {"message": "Seed executado com sucesso!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/workflow", response_model=List[WorkflowStage])
 def get_workflow(db: Session = Depends(get_db)):
+    """Retorna todas as etapas para montar as colunas do Kanban"""
     return db.query(models.WorkflowConfig).order_by(models.WorkflowConfig.id).all()
 
-# --- Logic to Move Project Stage ---
-@app.post("/projects/{project_id}/advance")
-def advance_project_stage(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(models.Project).filter(models.Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    # Assuming single active stage logic for simplicity in MVP
-    current_stage = db.query(models.ProjectStage).filter(models.ProjectStage.project_id == project.id).order_by(models.ProjectStage.id.desc()).first()
-    
-    if not current_stage:
-        raise HTTPException(status_code=400, detail="Project has no active stage")
+@app.get("/projects", response_model=List[ProjectRead])
+def get_projects(db: Session = Depends(get_db)):
+    """Retorna projetos para o Kanban"""
+    projects = db.query(models.Project).all()
+    # Mockando client_name se não tiver join complexo ainda
+    result = []
+    for p in projects:
+        p_dict = {
+            "id": p.id,
+            "name": p.name,
+            "client_name": p.client.name if p.client else "Sem Cliente",
+            "rooms": p.rooms
+        }
+        result.append(p_dict)
+    return result
 
-    # Find next step in workflow
-    current_wf = db.query(models.WorkflowConfig).filter(models.WorkflowConfig.sub_stage_number == current_stage.current_sub_stage_id).first()
-    if not current_wf:
-        raise HTTPException(status_code=500, detail="Current workflow stage not found in config")
-
-    # This is a bit simplistic: finding the next ID. 
-    # A better way would be order by stage_number, sub_stage_number
-    # Since IDs are sequential in seed, we can try next ID.
-    next_wf = db.query(models.WorkflowConfig).filter(models.WorkflowConfig.id > current_wf.id).order_by(models.WorkflowConfig.id).first()
-
-    if next_wf:
-        # Update current stage or create new one?
-        # For traceablity, let's update the current stage record to "Done" (if we had history) 
-        # or just update the pointer. MVP: Update pointer.
+# Endpoint temporário para criar dados de teste
+@app.post("/debug/create-dummy")
+def create_dummy_data(db: Session = Depends(get_db)):
+    # Verifica se já tem cliente
+    if db.query(models.Client).count() == 0:
+        c1 = models.Client(name="Ana Souza", phone="1199999999", origin="Instagram")
+        db.add(c1)
+        db.commit()
         
-        current_stage.stage_name = next_wf.name
-        current_stage.current_sub_stage_id = next_wf.sub_stage_number
-        current_stage.sla_deadline = datetime.now() + timedelta(days=next_wf.sla_days)
+        p1 = models.Project(name="Apto 402 - Ed. Solaris", client_id=c1.id)
+        db.add(p1)
         db.commit()
-        return {"status": "advanced", "new_stage": next_wf.sub_stage_number}
-    else:
-        # End of workflow
-        project.status = "Concluído"
-        db.commit()
-        return {"status": "completed"}
+        
+        # Pega ID da etapa 1.1
+        stage_1_1 = db.query(models.WorkflowConfig).filter_by(stage_code="1.1").first()
+        
+        if stage_1_1:
+            r1 = models.Room(name="Cozinha", project_id=p1.id, current_stage_id=stage_1_1.id)
+            r2 = models.Room(name="Suíte Master", project_id=p1.id, current_stage_id=stage_1_1.id)
+            db.add_all([r1, r2])
+            db.commit()
+            
+        return {"message": "Dados de teste criados!"}
+    return {"message": "Dados já existem."}
