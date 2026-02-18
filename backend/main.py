@@ -1,127 +1,104 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel
-from database import engine, get_db, Base
-import models
 from fastapi.middleware.cors import CORSMiddleware
-import os
+from database import get_db, engine, Base
+import models 
 
-# Cria as tabelas se não existirem
-Base.metadata.create_all(bind=engine)
+# Cria tabelas
+models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Fluxo Planejados ERP")
-
-# Configuração CORS
-origins = [
-    "http://localhost:5173",
-    "http://localhost:80",
-    "http://localhost",
-    "*", # Permite tudo para evitar dor de cabeça no MVP
-]
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def startup_event():
-    from seed import seed_workflow
-    try:
-        seed_workflow()
-        print("--- Seed Automático Executado ---")
-    except Exception as e:
-        print(f"Erro no Seed Automático: {e}")
+# DTOs
+from pydantic import BaseModel
+from typing import List, Optional
 
-# --- Schemas Pydantic (Simples para Leitura) ---
-class WorkflowStage(BaseModel):
-    id: int
-    stage_code: str
-    stage_name: str
-    stage_category: str
-    owner_role: str
-    
-    class Config:
-        from_attributes = True
-
-class RoomRead(BaseModel):
-    id: int
+class RoomCreate(BaseModel):
     name: str
-    current_stage_id: int
+    area: float
+    urgency: str
+    observations: str = ""
+
+class ProjectCreate(BaseModel):
+    client: dict 
+    project: dict 
+    rooms: List[RoomCreate]
+
+@app.post("/projects/full")
+def create_full_project(data: ProjectCreate, db: Session = Depends(get_db)):
+    # 1. Cria Cliente
+    # Safe get para evitar erros se campos faltarem
+    db_client = models.Client(
+        name=data.client.get("name"),
+        phone=data.client.get("phone"),
+        email=data.client.get("email"),
+        cpf=data.client.get("cpf"),
+        origin=data.client.get("origin"),
+        store_unit=data.client.get("store_unit"),
+        salesperson=data.client.get("salesperson"),
+        address=data.client.get("address", "")
+    )
+    db.add(db_client)
+    db.commit()
+    db.refresh(db_client)
     
-    class Config:
-        from_attributes = True
+    # 2. Cria Projeto
+    db_project = models.Project(
+        property_type=data.project.get("property_type"),
+        budget_expectation=data.project.get("budget_expectation"),
+        move_in_date=data.project.get("move_in_date"),
+        client_id=db_client.id,
+        name=f"Projeto {db_client.name}" # Nome default
+    )
+    db.add(db_project)
+    db.commit()
+    db.refresh(db_project)
+    
+    # 3. Cria Ambientes
+    for room in data.rooms:
+        db_room = models.Room(
+            name=room.name,
+            area=room.area,
+            urgency=room.urgency,
+            observations=room.observations,
+            project_id=db_project.id
+        )
+        db.add(db_room)
+    
+    db.commit()
+    return {"status": "ok", "project_id": db_project.id}
 
-class ProjectRead(BaseModel):
-    id: int
-    name: str
-    client_name: str
-    rooms: List[RoomRead] = []
-
-    class Config:
-        from_attributes = True
-
-# --- Endpoints ---
-
-@app.get("/")
-def read_root():
-    return {"message": "API Fluxo Planejados está ON! 🚀"}
-
-@app.post("/seed")
-def run_seed():
-    from seed import seed_workflow
-    try:
-        seed_workflow()
-        return {"message": "Seed executado com sucesso!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/workflow", response_model=List[WorkflowStage])
-def get_workflow(db: Session = Depends(get_db)):
-    """Retorna todas as etapas para montar as colunas do Kanban"""
-    return db.query(models.WorkflowConfig).order_by(models.WorkflowConfig.id).all()
-
-@app.get("/projects", response_model=List[ProjectRead])
-def get_projects(db: Session = Depends(get_db)):
-    """Retorna projetos para o Kanban"""
+@app.get("/kanban")
+def get_kanban(db: Session = Depends(get_db)):
     projects = db.query(models.Project).all()
-    # Mockando client_name se não tiver join complexo ainda
+    
     result = []
     for p in projects:
+        # Serialização manual simples
         p_dict = {
             "id": p.id,
-            "name": p.name,
-            "client_name": p.client.name if p.client else "Sem Cliente",
-            "rooms": p.rooms
+            "clientName": p.client.name if p.client else f"Projeto {p.id}",
+            "stageId": str(p.current_stage_id),
+            "subStage": p.current_sub_stage,
+             # Mock fields for UI compatibility if needed or real if added
+            "owner": p.client.salesperson if p.client else "Vendas",
+            "daysLeft": 5, # Mock SLA logic
+            "urgency": "Normal", # Mock urgency logic derived from rooms?
+            "area": sum([r.area for r in p.rooms]) if p.rooms else 0
         }
         result.append(p_dict)
+        
     return result
 
-# Endpoint temporário para criar dados de teste
-@app.post("/debug/create-dummy")
-def create_dummy_data(db: Session = Depends(get_db)):
-    # Verifica se já tem cliente
-    if db.query(models.Client).count() == 0:
-        c1 = models.Client(name="Ana Souza", phone="1199999999", origin="Instagram")
-        db.add(c1)
-        db.commit()
-        
-        p1 = models.Project(name="Apto 402 - Ed. Solaris", client_id=c1.id)
-        db.add(p1)
-        db.commit()
-        
-        # Pega ID da etapa 1.1
-        stage_1_1 = db.query(models.WorkflowConfig).filter_by(stage_code="1.1").first()
-        
-        if stage_1_1:
-            r1 = models.Room(name="Cozinha", project_id=p1.id, current_stage_id=stage_1_1.id)
-            r2 = models.Room(name="Suíte Master", project_id=p1.id, current_stage_id=stage_1_1.id)
-            db.add_all([r1, r2])
-            db.commit()
-            
-        return {"message": "Dados de teste criados!"}
-    return {"message": "Dados já existem."}
+@app.on_event("startup")
+def startup_event():
+    # Seed se necessário
+    pass
