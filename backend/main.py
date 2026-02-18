@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from database import get_db, engine, Base
 import models 
 import auth
+import os
 
 # Cria tabelas
 models.Base.metadata.create_all(bind=engine)
@@ -146,8 +147,8 @@ class LoginRequest(BaseModel):
 def startup_event():
     # Seed / Repair Admin
     db = Session(bind=engine)
-    admin_email = "ottonsilva@gmail.com"
-    default_pass = "123456"
+    admin_email = os.getenv("ADMIN_EMAIL", "ottonsilva@gmail.com")
+    default_pass = os.getenv("ADMIN_PASSWORD", "123456")
     
     user = db.query(models.User).filter(models.User.email == admin_email).first()
     

@@ -4,9 +4,11 @@ import { Project, Client, Batch, Environment } from '../types';
 // Detect Backend URL
 const getBaseUrl = () => {
     // @ts-ignore
-    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    const envUrl = import.meta.env.VITE_API_URL;
+    if (envUrl) return envUrl;
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8000';
-    return 'https://fluxo-erp.rbhavy.easypanel.host';
+    // URL real do backend no Easypanel
+    return 'https://fluxo-erp-fluxo-erp.rbhavy.easypanel.host';
 };
 
 const api = axios.create({
