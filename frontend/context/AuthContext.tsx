@@ -38,9 +38,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         formData.append('username', username);
         formData.append('password', pass);
 
-        const response = await api.post('/token', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        const response = await api.post('/token', formData);
 
         const { access_token, user } = response.data;
 
