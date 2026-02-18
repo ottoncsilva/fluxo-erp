@@ -3,6 +3,7 @@ import { Project, Client, Batch, Environment } from '../types';
 
 // Detect Backend URL
 const getBaseUrl = () => {
+    // @ts-ignore
     if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8000';
     return 'https://fluxo-erp.rbhavy.easypanel.host';
@@ -61,14 +62,14 @@ export const fetchProjects = async (): Promise<{ projects: Project[], batches: B
 
     // Auto-generate Batches from Projects (since backend doesn't fully handle batches yet)
     // This is temporary until backend has full batch logic
-    const batches: Batch[] = projects.map(p => ({
+    const batches: Batch[] = projects.map((p: Project) => ({
         id: `b-${p.id}`,
         projectId: p.id,
         name: `Projeto ${p.client.name}`,
         // Map backend project status/stage to frontend step ID
         // Simplified Logic:
         currentStepId: '1.1',
-        environmentIds: p.environments.map(e => e.id),
+        environmentIds: p.environments.map((e: Environment) => e.id),
         createdAt: p.created_at,
         lastUpdated: p.created_at
     }));
