@@ -34,11 +34,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, []);
 
     const login = async (username: string, pass: string) => {
-        const formData = new FormData();
-        formData.append('username', username);
-        formData.append('password', pass);
-
-        const response = await api.post('/token', formData);
+        // Agora envia JSON puro
+        const response = await api.post('/auth/login', {
+            email: username,
+            password: pass
+        });
 
         const { access_token, user } = response.data;
 

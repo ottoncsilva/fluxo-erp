@@ -137,6 +137,11 @@ def get_projects(db: Session = Depends(get_db)):
     return result
 
 
+# Schemas
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 @app.on_event("startup")
 def startup_event():
     # Seed / Repair Admin
@@ -146,25 +151,52 @@ def startup_event():
     
     user = db.query(models.User).filter(models.User.email == admin_email).first()
     
-    if not user:
-        # Create
-        print(f"--- Criando Admin: {admin_email} ---")
-        user = models.User(
-            email=admin_email,
-            hashed_password=auth.get_password_hash(default_pass),
-            full_name="Otton Silva (Admin)",
-            role="admin"
-        )
-        db.add(user)
-        db.commit()
-    else:
-        # Check & Repair
-        if not auth.verify_password(default_pass, user.hashed_password):
-            print(f"--- Corrigindo senha do Admin: {admin_email} ---")
-            user.hashed_password = auth.get_password_hash(default_pass)
+    try:
+        if not user:
+            print(f"--- Criando Admin: {admin_email} ---")
+            user = models.User(
+                email=admin_email,
+                hashed_password=auth.get_password_hash(default_pass),
+                full_name="Otton Silva (Admin)",
+                role="admin"
+            )
+            db.add(user)
             db.commit()
+        else:
+            # Check & Repair
+            # Simplificação: Sempre reseta hash se a flag de debug estiver ativa ou apenas confia na verificação
+            # Para garantir: Vamos verificar e se falhar, atualizar.
+            if not auth.verify_password(default_pass, user.hashed_password):
+                print(f"--- Corrigindo senha do Admin: {admin_email} ---")
+                user.hashed_password = auth.get_password_hash(default_pass)
+                db.commit()
+    except Exception as e:
+        print(f"Erro no startup seed: {e}")
             
     db.close()
+
+@app.post("/auth/login")
+async def login_json(data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+    if not user or not auth.verify_password(data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+    
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer", 
+        "user": {
+            "name": user.full_name, 
+            "email": user.email, 
+            "role": user.role
+        }
+    }
 
 @app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
