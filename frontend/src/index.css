@@ -2,18 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Personalização da barra de rolagem */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Reset básico para Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+  /* Previne seleção do texto do ícone */
 }
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f1f1; 
+
+/* Custom Scrollbar (Vertical & Horizontal) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #c1c1c1; 
-  border-radius: 10px;
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8; 
+
+::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+/* Utilitários Específicos do Template */
+.kanban-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.kanban-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+/* Estilo para links ativos (se necessário) */
+.tab-active {
+  border-bottom: 2px solid #137fec;
+  color: #137fec;
 }
