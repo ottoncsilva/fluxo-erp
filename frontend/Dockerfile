@@ -17,4 +17,4 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh", "-c", "echo \"window.env = { VITE_API_URL: '${VITE_API_URL}' };\" > /usr/share/nginx/html/config.js && nginx -g 'daemon off;'"]
