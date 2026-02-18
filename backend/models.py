@@ -30,6 +30,11 @@ class Project(Base):
     move_in_date = Column(String, nullable=True)
     budget_expectation = Column(Float, default=0.0)
     
+    # Novos Campos Solicitados
+    property_status = Column(String) # "Na Planta/Obra", "Pronto/Entregue"
+    purchase_moment = Column(String) # "Imediata", "Futura"
+
+    
     # Controle de Fluxo
     current_stage_id = Column(String, default="1") # 1, 2, 4.1...
     current_sub_stage = Column(String, default="1.1")

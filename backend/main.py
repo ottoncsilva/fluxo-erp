@@ -53,6 +53,8 @@ def create_full_project(data: ProjectCreate, db: Session = Depends(get_db)):
     # 2. Cria Projeto
     db_project = models.Project(
         property_type=data.project.get("property_type"),
+        property_status=data.project.get("property_status"), # Novo
+        purchase_moment=data.project.get("purchase_moment"), # Novo
         budget_expectation=data.project.get("budget_expectation"),
         move_in_date=data.project.get("move_in_date"),
         client_id=db_client.id,
