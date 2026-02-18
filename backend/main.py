@@ -139,19 +139,31 @@ def get_projects(db: Session = Depends(get_db)):
 
 @app.on_event("startup")
 def startup_event():
-    # Seed Admin
+    # Seed / Repair Admin
     db = Session(bind=engine)
     admin_email = "ottonsilva@gmail.com"
-    if not db.query(models.User).filter(models.User.email == admin_email).first():
-        admin = models.User(
+    default_pass = "123456"
+    
+    user = db.query(models.User).filter(models.User.email == admin_email).first()
+    
+    if not user:
+        # Create
+        print(f"--- Criando Admin: {admin_email} ---")
+        user = models.User(
             email=admin_email,
-            hashed_password=auth.get_password_hash("123456"),
+            hashed_password=auth.get_password_hash(default_pass),
             full_name="Otton Silva (Admin)",
             role="admin"
         )
-        db.add(admin)
+        db.add(user)
         db.commit()
-        print(f"--- Admin criado: {admin_email} ---")
+    else:
+        # Check & Repair
+        if not auth.verify_password(default_pass, user.hashed_password):
+            print(f"--- Corrigindo senha do Admin: {admin_email} ---")
+            user.hashed_password = auth.get_password_hash(default_pass)
+            db.commit()
+            
     db.close()
 
 @app.post("/token")
