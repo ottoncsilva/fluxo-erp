@@ -1,9 +1,8 @@
-import React from 'react';
-import KanbanBoard from './components/KanbanBoard';
+import { KanbanBoard } from './components/KanbanBoard';
 
 function App() {
     return (
-        <div className="App">
+        <div className="w-full h-screen">
             <KanbanBoard />
         </div>
     );
