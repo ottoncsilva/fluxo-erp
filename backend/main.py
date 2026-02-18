@@ -1,8 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from database import get_db, engine, Base
 import models 
+import auth
 
 # Cria tabelas
 models.Base.metadata.create_all(bind=engine)
@@ -33,7 +36,7 @@ class ProjectCreate(BaseModel):
     rooms: List[RoomCreate]
 
 @app.post("/projects/full")
-def create_full_project(data: ProjectCreate, db: Session = Depends(get_db)):
+def create_full_project(data: ProjectCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     # 1. Cria Cliente
     # Safe get para evitar erros se campos faltarem
     db_client = models.Client(
@@ -100,7 +103,68 @@ def get_kanban(db: Session = Depends(get_db)):
         
     return result
 
+@app.get("/projects")
+def get_projects(db: Session = Depends(get_db)):
+    projects = db.query(models.Project).all()
+    # Retorna estrutura completa necessária para o novo frontend
+    result = []
+    for p in projects:
+        p_dict = {
+            "id": p.id,
+            "client_name": p.client.name if p.client else None,
+            "client": {
+                "id": p.client.id,
+                "name": p.client.name,
+                "phone": p.client.phone,
+                "email": p.client.email,
+                "address": p.client.address,
+                "origin": p.client.origin
+            } if p.client else None,
+            "created_at": p.entry_date.isoformat() if hasattr(p, 'entry_date') and p.entry_date else None,
+            "budget_expectation": p.budget_expectation,
+            "move_in_date": p.move_in_date,
+            "rooms": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "area_sqm": r.area,
+                    "urgency_level": r.urgency,
+                    "observations": r.observations
+                } for r in p.rooms
+            ]
+        }
+        result.append(p_dict)
+    return result
+
+
 @app.on_event("startup")
 def startup_event():
-    # Seed se necessário
-    pass
+    # Seed Admin
+    db = Session(bind=engine)
+    admin_email = "ottonsilva@gmail.com"
+    if not db.query(models.User).filter(models.User.email == admin_email).first():
+        admin = models.User(
+            email=admin_email,
+            hashed_password=auth.get_password_hash("123456"),
+            full_name="Otton Silva (Admin)",
+            role="admin"
+        )
+        db.add(admin)
+        db.commit()
+        print(f"--- Admin criado: {admin_email} ---")
+    db.close()
+
+@app.post("/token")
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer", "user": {"name": user.full_name, "email": user.email, "role": user.role}}

@@ -18,6 +18,15 @@ class Client(Base):
 
     projects = relationship("Project", back_populates="client")
 
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    full_name = Column(String)
+    role = Column(String, default="user") # admin, user
+    is_active = Column(Boolean, default=True)
+
 class Project(Base):
     __tablename__ = "projects"
     id = Column(Integer, primary_key=True, index=True)
