@@ -58,7 +58,7 @@ class Room(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"))
     name = Column(String) # Cozinha, Quarto...
-    area = Column(Float)
+    area_sqm = Column(Float)
     urgency = Column(String) # Alta, Normal
     observations = Column(Text)
     

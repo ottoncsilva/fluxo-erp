@@ -71,7 +71,7 @@ def create_full_project(data: ProjectCreate, db: Session = Depends(get_db), curr
     for room in data.rooms:
         db_room = models.Room(
             name=room.name,
-            area=room.area,
+            area_sqm=room.area,
             urgency=room.urgency,
             observations=room.observations,
             project_id=db_project.id
@@ -97,7 +97,7 @@ def get_kanban(db: Session = Depends(get_db)):
             "owner": p.client.salesperson if p.client else "Vendas",
             "daysLeft": 5, # Mock SLA logic
             "urgency": "Normal", # Mock urgency logic derived from rooms?
-            "area": sum([r.area for r in p.rooms]) if p.rooms else 0
+            "area": sum([r.area_sqm for r in p.rooms]) if p.rooms else 0
         }
         result.append(p_dict)
         
@@ -127,7 +127,7 @@ def get_projects(db: Session = Depends(get_db)):
                 {
                     "id": r.id,
                     "name": r.name,
-                    "area_sqm": r.area,
+                    "area_sqm": r.area_sqm,
                     "urgency_level": r.urgency,
                     "observations": r.observations
                 } for r in p.rooms
