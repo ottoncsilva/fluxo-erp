@@ -95,6 +95,85 @@ def startup_event():
         if not settings:
             db.add(models.CompanySettings(name="FluxoPlanejados"))
             db.commit()
+
+        # Seed WorkflowConfig
+        if db.query(models.WorkflowConfig).count() == 0:
+            workflow_steps = [
+                ("1.1","Briefing e Qualificação","Pre-Venda","Vendedor",1),
+                ("1.2","Visita Showroom","Pre-Venda","Vendedor",5),
+                ("1.3","Follow Up (Pré-Venda)","Pre-Venda","Vendedor",10),
+                ("2.1","Projetar Ambientes","Projeto","Projetista",1),
+                ("2.2","Projetar Mobiliário","Projeto","Projetista",4),
+                ("2.3","Orçamento","Projeto","Projetista",0),
+                ("2.4","Renderização e Apresentação","Projeto","Projetista",1),
+                ("2.5","Reunião Primeira Apresentação","Projeto","Vendedor",0),
+                ("2.6","Ajuste de Proposta","Projeto","Projetista",3),
+                ("2.7","Follow Up (Venda)","Projeto","Vendedor",3),
+                ("2.8","Reunião de Fechamento","Projeto","Vendedor",0),
+                ("2.9","Detalhamento de Contrato","Projeto","Vendedor",1),
+                ("2.10","Aprovação Detalhamento Contrato","Projeto","Vendedor",2),
+                ("3.1","Avaliação para Medição","Medição","Medidor",0),
+                ("3.2","Medição","Medição","Medidor",1),
+                ("4.1","Construção dos Ambientes","Executivo","Liberador",1),
+                ("4.2","Reunião Alinhamento c/ Vendas","Executivo","Liberador",1),
+                ("4.3","Construção do Mobiliário","Executivo","Liberador",4),
+                ("4.4","Aprovação Financeira","Executivo","Financeiro",2),
+                ("4.5","Detalhamento Executivo","Executivo","Liberador",3),
+                ("4.6","Aprovação do Executivo","Executivo","Vendedor",2),
+                ("4.7","Correção","Executivo","Liberador",1),
+                ("4.8","Aprov. Financeira (Executivo)","Executivo","Financeiro",1),
+                ("4.9","Aprov. Executivo (Final)","Executivo","Liberador",0),
+                ("5.1","Implantação","Fabricação","Financeiro",1),
+                ("5.2","Fabricação","Fabricação","Industria",26),
+                ("6.1","Verificação pré-montagem","Logística","Coordenador de Montagem",2),
+                ("6.2","Agendar Transporte","Logística","Coordenador de Montagem",0),
+                ("6.3","Transporte e Entrega","Logística","Logistica",5),
+                ("7.1","Montagem","Montagem","Montador",3),
+                ("7.2","Checklist Finalização Montagem","Montagem","Coordenador de Montagem",1),
+                ("8.1","Solicitação de Peças","Pós-Montagem","Liberador",2),
+                ("8.2","Fabricação (Reposição)","Pós-Montagem","Industria",15),
+                ("8.3","Transporte e Entrega (Reposição)","Pós-Montagem","Logistica",5),
+                ("8.4","Pós Montagem","Pós-Montagem","Montador",7),
+                ("8.5","Checklist Finalização Pós","Pós-Montagem","Montador",1),
+                ("9.0","Projeto Entregue","Concluído","Gerente",0),
+            ]
+            for code, name, category, owner, sla in workflow_steps:
+                db.add(models.WorkflowConfig(stage_code=code, stage_name=name, stage_category=category, owner_role=owner, sla_days=sla))
+            db.commit()
+
+        # Seed demo projects if DB is empty
+        if db.query(models.Project).count() == 0:
+            demo_data = [
+                ("Ana Beatriz Costa", "11999001122", "Cozinha + Sala", "1.2"),
+                ("Roberto Alves Mendes", "11988002233", "Quarto Master + Closet", "2.5"),
+                ("Carla Souza Lima", "11977003344", "Cozinha + Área Gourmet", "4.3"),
+                ("Marcos Henrique", "11966004455", "Suíte + Escritório", "5.2"),
+                ("Juliana Ferreira", "11955005566", "Sala de Estar + TV", "7.1"),
+            ]
+            admin_user = db.query(models.User).first()
+            for i, (name, phone, env_names, step) in enumerate(demo_data):
+                client = models.Client(name=name, phone=phone, email=f"demo{i+1}@exemplo.com", address="", status="Ativo", origin="Indicação Cliente")
+                db.add(client)
+                db.flush()
+                project = models.Project(client_id=client.id, seller_name="Otton Silva", entry_date=datetime.datetime.utcnow())
+                db.add(project)
+                db.flush()
+                # Create rooms
+                room_ids = []
+                for env_name in env_names.split(" + "):
+                    room = models.Room(project_id=project.id, name=env_name.strip(), area_sqm=12.0, urgency_level="Normal", urgency="Normal", estimated_value=8000.0, status="InBatch", version=1)
+                    db.add(room)
+                    db.flush()
+                    room_ids.append(room.id)
+                # Create batch at given step
+                batch = models.ProjectBatch(project_id=project.id, batch_name="Projeto Completo", current_step_id=step)
+                db.add(batch)
+                db.flush()
+                for room_id in room_ids:
+                    r = db.query(models.Room).filter(models.Room.id == room_id).first()
+                    r.batch_id = batch.id
+                db.commit()
+            print("Demo seed data created successfully.")
     except Exception as e:
         print(f"Startup seed error: {e}")
     finally:
