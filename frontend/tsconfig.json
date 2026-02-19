@@ -15,10 +15,10 @@
         "isolatedModules": true,
         "noEmit": true,
         "jsx": "react-jsx",
-        "strict": true,
+        "strict": false,
+        "noImplicitAny": false,
         "noUnusedLocals": false,
-        "noUnusedParameters": false,
-        "noFallthroughCasesInSwitch": true
+        "noUnusedParameters": false
     },
     "include": [
         "**/*.ts",

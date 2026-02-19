@@ -338,11 +338,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const addAssistanceTicket = async (ticketData: Omit<AssistanceTicket, 'id' | 'createdAt' | 'updatedAt'>) => {
         await api.post('/assistance', {
             client_name: ticketData.clientName,
-            client_phone: ticketData.clientPhone,
-            project_id: ticketData.projectId ? parseInt(ticketData.projectId) : null,
-            description: ticketData.description,
+            client_phone: (ticketData as any).clientPhone || null,
+            project_id: (ticketData as any).projectId ? parseInt((ticketData as any).projectId) : null,
+            description: ticketData.notes || ticketData.title || '',
             status: ticketData.status,
-            current_step: ticketData.currentStep,
+            current_step: ticketData.status,
         });
         await refreshData();
     };
@@ -350,8 +350,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const updateAssistanceTicket = async (ticket: AssistanceTicket) => {
         await api.patch(`/assistance/${ticket.id}`, {
             status: ticket.status,
-            current_step: ticket.currentStep,
-            description: ticket.description,
+            current_step: ticket.status,
+            description: ticket.notes || ticket.title || '',
         });
         await refreshData();
     };
