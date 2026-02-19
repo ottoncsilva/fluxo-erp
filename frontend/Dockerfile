@@ -1,5 +1,5 @@
-# Stage 1: Build the React application
-FROM node:18-alpine as build
+# Stage 1: Build React app
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
@@ -7,9 +7,11 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
+
+# Build sem VITE_API_URL - usaremos /api/ como prefixo relativo
 RUN npm run build
 
-# Stage 2: Serve the application with Nginx
+# Stage 2: Serve com Nginx + Proxy para Backend
 FROM nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
@@ -17,4 +19,4 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-CMD ["/bin/sh", "-c", "echo \"window.env = { VITE_API_URL: '${VITE_API_URL}' };\" > /usr/share/nginx/html/config.js && nginx -g 'daemon off;'"]
+CMD ["nginx", "-g", "daemon off;"]

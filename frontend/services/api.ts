@@ -1,20 +1,17 @@
 import axios from 'axios';
 import { Project, Client, Batch, Environment } from '../types';
 
-// Detect Backend URL
-const getBaseUrl = () => {
-    // @ts-ignore
-    const envUrl = import.meta.env.VITE_API_URL;
-    if (envUrl) return envUrl;
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8000';
-    // URL real do backend no Easypanel
-    return 'https://fluxo-erp-fluxo-erp.rbhavy.easypanel.host';
-};
+// Em produção, o Nginx faz proxy de /api/* para o backend.
+// Em desenvolvimento local, chamamos o backend diretamente.
+const BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8000'
+    : '/api';
 
 const api = axios.create({
-    baseURL: getBaseUrl(),
+    baseURL: BASE_URL,
     headers: { 'Content-Type': 'application/json' }
 });
+
 
 // --- Adapters (Backend -> Frontend) ---
 

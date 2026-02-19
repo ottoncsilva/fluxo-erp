@@ -20,26 +20,21 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/fluxo_erp
+      ADMIN_EMAIL: ottonsilva@gmail.com
+      ADMIN_PASSWORD: "123456"
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
 
   frontend:
-    build: 
+    build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: fluxo-planejados-frontend
     depends_on:
       - backend
-    environment:
-      VITE_API_URL: http://localhost:8000
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "80:80"
 
 volumes:
   postgres_data:
