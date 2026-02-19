@@ -23,30 +23,33 @@ const AppContent: React.FC = () => {
 
   // Auth Guard
   if (!currentUser) {
-      return <Login />;
+    return <Login />;
   }
 
   // Permission Check Helper
   const canAccess = (view: ViewState): boolean => {
-      const userPerms = permissions.find(p => p.role === currentUser.role);
-      if(!userPerms) return false;
-      
-      switch(view) {
-          case ViewState.DASHBOARD: return userPerms.canViewDashboard;
-          case ViewState.KANBAN: return userPerms.canViewKanban;
-          case ViewState.CLIENT_LIST: return userPerms.canViewClients;
-          case ViewState.SETTINGS: return userPerms.canViewSettings;
-          default: return true;
-      }
+    if (!currentUser) return false;
+    // Admin/Proprietario/Gerente têm acesso total
+    if (['Admin', 'Proprietario', 'Gerente'].includes(currentUser.role)) return true;
+    const userPerms = permissions.find(p => p.role === currentUser.role);
+    if (!userPerms) return true; // default: allow access if role not configured
+
+    switch (view) {
+      case ViewState.DASHBOARD: return userPerms.canViewDashboard;
+      case ViewState.KANBAN: return userPerms.canViewKanban;
+      case ViewState.CLIENT_LIST: return userPerms.canViewClients;
+      case ViewState.SETTINGS: return userPerms.canViewSettings;
+      default: return true;
+    }
   };
 
   const handleBackToKanban = () => {
-      setCurrentProjectId(null);
-      // No need to switch view since ProjectDetails is now a modal
+    setCurrentProjectId(null);
+    // No need to switch view since ProjectDetails is now a modal
   };
-  
+
   const handleBackToClientList = () => {
-      setCurrentView(ViewState.CLIENT_LIST);
+    setCurrentView(ViewState.CLIENT_LIST);
   }
 
   const renderContent = () => {
@@ -67,59 +70,59 @@ const AppContent: React.FC = () => {
       <aside className="w-20 bg-white dark:bg-[#1a2632] border-r border-slate-200 dark:border-slate-800 flex flex-col items-center py-6 z-30 shrink-0">
         <div className="size-10 bg-primary rounded-xl flex items-center justify-center text-white font-bold text-xl mb-8 shadow-lg shadow-primary/20 overflow-hidden">
           {companySettings.logoUrl ? (
-              <img src={companySettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+            <img src={companySettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
           ) : (
-              companySettings.name.charAt(0)
+            companySettings.name.charAt(0)
           )}
         </div>
-        
+
         <nav className="flex flex-col gap-6 w-full px-4">
           {canAccess(ViewState.DASHBOARD) && (
-              <SidebarButton 
-                icon="dashboard" 
-                isActive={currentView === ViewState.DASHBOARD} 
-                onClick={() => setCurrentView(ViewState.DASHBOARD)}
-                tooltip="Início"
-              />
+            <SidebarButton
+              icon="dashboard"
+              isActive={currentView === ViewState.DASHBOARD}
+              onClick={() => setCurrentView(ViewState.DASHBOARD)}
+              tooltip="Início"
+            />
           )}
           {canAccess(ViewState.CLIENT_LIST) && (
-              <SidebarButton 
-                icon="groups" 
-                isActive={currentView === ViewState.CLIENT_LIST || currentView === ViewState.CLIENT_REGISTRATION} 
-                onClick={() => setCurrentView(ViewState.CLIENT_LIST)}
-                tooltip="Clientes"
-              />
+            <SidebarButton
+              icon="groups"
+              isActive={currentView === ViewState.CLIENT_LIST || currentView === ViewState.CLIENT_REGISTRATION}
+              onClick={() => setCurrentView(ViewState.CLIENT_LIST)}
+              tooltip="Clientes"
+            />
           )}
           {canAccess(ViewState.KANBAN) && (
-              <SidebarButton 
-                icon="view_kanban" 
-                isActive={currentView === ViewState.KANBAN} 
-                onClick={() => setCurrentView(ViewState.KANBAN)}
-                tooltip="Painel de Controle"
-              />
+            <SidebarButton
+              icon="view_kanban"
+              isActive={currentView === ViewState.KANBAN}
+              onClick={() => setCurrentView(ViewState.KANBAN)}
+              tooltip="Painel de Controle"
+            />
           )}
-          
-          <SidebarButton 
-            icon="handyman" 
-            isActive={currentView === ViewState.ASSISTANCE} 
+
+          <SidebarButton
+            icon="handyman"
+            isActive={currentView === ViewState.ASSISTANCE}
             onClick={() => setCurrentView(ViewState.ASSISTANCE)}
             tooltip="Pedido de Assistência"
           />
           <div className="h-px bg-slate-200 dark:bg-slate-700 w-full my-2"></div>
           {canAccess(ViewState.SETTINGS) && (
-              <SidebarButton 
-                icon="settings" 
-                isActive={currentView === ViewState.SETTINGS} 
-                onClick={() => setCurrentView(ViewState.SETTINGS)} 
-                tooltip="Configurações" 
-              />
+            <SidebarButton
+              icon="settings"
+              isActive={currentView === ViewState.SETTINGS}
+              onClick={() => setCurrentView(ViewState.SETTINGS)}
+              tooltip="Configurações"
+            />
           )}
-          <button 
-             onClick={logout}
-             className="w-full aspect-square rounded-xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all mt-auto"
-             title="Sair"
+          <button
+            onClick={logout}
+            className="w-full aspect-square rounded-xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all mt-auto"
+            title="Sair"
           >
-              <span className="material-symbols-outlined">logout</span>
+            <span className="material-symbols-outlined">logout</span>
           </button>
         </nav>
       </aside>
@@ -127,53 +130,53 @@ const AppContent: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a2632] flex items-center justify-between px-6 shrink-0 z-20">
-             <div className="flex items-center gap-4">
-               <h1 className="text-xl font-bold text-slate-800 dark:text-white">
-                 {currentView === ViewState.DASHBOARD && "Visão Geral"}
-                 {currentView === ViewState.KANBAN && "Painel de Controle"}
-                 {currentView === ViewState.CLIENT_REGISTRATION && "Novo Cadastro"}
-                 {currentView === ViewState.CLIENT_LIST && "Carteira de Clientes"}
-                 {currentView === ViewState.SETTINGS && "Configurações do Sistema"}
-                 {currentView === ViewState.ASSISTANCE && "Central de Assistência"}
-               </h1>
-             </div>
-             <div className="flex items-center gap-6">
-                {/* Fantasy Name Highlight */}
-               <div className="hidden md:flex flex-col items-end">
-                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Empresa</span>
-                   <span className="text-sm font-bold text-primary dark:text-blue-400">{companySettings.name}</span>
-               </div>
-               <div className="h-8 w-px bg-slate-200 dark:border-slate-700"></div>
-               <div className="flex items-center gap-3">
-                 <div className="size-9 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 overflow-hidden">
-                     {currentUser.avatar ? <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" /> : currentUser.name.charAt(0)}
-                 </div>
-                 <div className="hidden md:block">
-                   <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{currentUser.name}</p>
-                   <p className="text-xs text-slate-500">{currentUser.role}</p>
-                 </div>
-               </div>
-             </div>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold text-slate-800 dark:text-white">
+              {currentView === ViewState.DASHBOARD && "Visão Geral"}
+              {currentView === ViewState.KANBAN && "Painel de Controle"}
+              {currentView === ViewState.CLIENT_REGISTRATION && "Novo Cadastro"}
+              {currentView === ViewState.CLIENT_LIST && "Carteira de Clientes"}
+              {currentView === ViewState.SETTINGS && "Configurações do Sistema"}
+              {currentView === ViewState.ASSISTANCE && "Central de Assistência"}
+            </h1>
+          </div>
+          <div className="flex items-center gap-6">
+            {/* Fantasy Name Highlight */}
+            <div className="hidden md:flex flex-col items-end">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Empresa</span>
+              <span className="text-sm font-bold text-primary dark:text-blue-400">{companySettings.name}</span>
+            </div>
+            <div className="h-8 w-px bg-slate-200 dark:border-slate-700"></div>
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 overflow-hidden">
+                {currentUser.avatar ? <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" /> : currentUser.name.charAt(0)}
+              </div>
+              <div className="hidden md:block">
+                <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{currentUser.name}</p>
+                <p className="text-xs text-slate-500">{currentUser.role}</p>
+              </div>
+            </div>
+          </div>
         </header>
-        
+
         <div className="flex-1 overflow-hidden relative">
-            {renderContent()}
+          {renderContent()}
         </div>
       </div>
 
       {/* Project Details Modal Overlay */}
       {currentProjectId && (
-          <div 
-            className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
-            onClick={handleBackToKanban}
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={handleBackToKanban}
+        >
+          <div
+            className="bg-white dark:bg-[#101922] w-full max-w-[90vw] h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
           >
-              <div 
-                className="bg-white dark:bg-[#101922] w-full max-w-[90vw] h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
-                onClick={(e) => e.stopPropagation()}
-              >
-                  <ProjectDetails onBack={handleBackToKanban} />
-              </div>
+            <ProjectDetails onBack={handleBackToKanban} />
           </div>
+        </div>
       )}
     </div>
   );
@@ -196,13 +199,13 @@ interface SidebarButtonProps {
 
 const SidebarButton: React.FC<SidebarButtonProps> = ({ icon, isActive, onClick, tooltip }) => {
   return (
-    <button 
+    <button
       onClick={onClick}
       title={tooltip}
       className={`
         w-full aspect-square rounded-xl flex items-center justify-center transition-all duration-200 group relative
-        ${isActive 
-          ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+        ${isActive
+          ? 'bg-primary text-white shadow-lg shadow-primary/30'
           : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary'}
       `}
     >
