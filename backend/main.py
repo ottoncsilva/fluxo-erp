@@ -32,6 +32,46 @@ def get_db():
 # ─── STARTUP SEED ───────────────────────────────────────────
 @app.on_event("startup")
 def startup_event():
+    # ── Auto-migrate: add missing columns to existing tables ──────────────
+    from sqlalchemy import text
+    migrations = [
+        # users
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS contract_type VARCHAR",
+        # clients
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'Ativo'",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS budget_expectation FLOAT",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS time_move_in VARCHAR",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS avatar VARCHAR",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS profile_pains TEXT",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS property_type VARCHAR",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS cpf VARCHAR",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS origin VARCHAR",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS store_unit VARCHAR",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson VARCHAR",
+        # projects
+        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS seller_name VARCHAR",
+        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS entry_date TIMESTAMPTZ DEFAULT NOW()",
+        # rooms
+        "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS urgency_level VARCHAR DEFAULT 'Normal'",
+        "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS estimated_value FLOAT",
+        "ALTER TABLE rooms ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1",
+        # batches
+        "ALTER TABLE project_batches ADD COLUMN IF NOT EXISTS current_step_id VARCHAR DEFAULT '1.1'",
+        "ALTER TABLE project_batches ADD COLUMN IF NOT EXISTS last_updated TIMESTAMPTZ DEFAULT NOW()",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception as e:
+                print(f"Migration skip (ok): {e}")
+
+    # ── Create new tables if absent ───────────────────────────────────────
+    models.Base.metadata.create_all(bind=engine)
+
+    # ── Seed admin user ───────────────────────────────────────────────────
     db = SessionLocal()
     admin_email = os.getenv("ADMIN_EMAIL", "ottonsilva@gmail.com")
     default_pass = os.getenv("ADMIN_PASSWORD", "123456")
@@ -50,7 +90,7 @@ def startup_event():
             if not auth.verify_password(default_pass, user.hashed_password):
                 user.hashed_password = auth.get_password_hash(default_pass)
                 db.commit()
-        # Seed company settings if not exists
+        # Seed company settings
         settings = db.query(models.CompanySettings).first()
         if not settings:
             db.add(models.CompanySettings(name="FluxoPlanejados"))
